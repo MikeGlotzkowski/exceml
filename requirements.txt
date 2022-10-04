@@ -1,3 +1,8 @@
 pandas
 sklearn
 auto-sklearn
+requests
+pymongo
+flask
+werkzeug
+requests

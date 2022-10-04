@@ -1,0 +1,41 @@
+# Use postgres/example user/password credentials
+version: '3.1'
+
+services:
+
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      # - POSTGRES_HOST_AUTH_METHOD=trust"
+    ports:
+      - '5432:5432'
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+  
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    # environment:
+    #   # MONGO_INITDB_DATABASE: mydatabase
+    #   MONGO_INITDB_ROOT_USERNAME: "username1"
+    #   MONGO_INITDB_ROOT_PASSWORD: "password1"
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    # environment:
+    #   # ME_CONFIG_MONGODB_INITDB_DATABASE: mydatabase
+    #   ME_CONFIG_MONGODB_ADMINUSERNAME: "username1"
+    #   ME_CONFIG_MONGODB_ADMINPASSWORD: "password1"
