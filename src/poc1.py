@@ -5,11 +5,12 @@ import os
 import sys
 import csv
 import json
+import threading
 import pymongo
 import datetime
 import requests
 import pandas as pd
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, url_for
 from sklearn.model_selection import train_test_split
 from werkzeug.utils import secure_filename
 from bson.json_util import dumps
@@ -102,7 +103,7 @@ def start_automl(file_path, y_column):
     pd.DataFrame(cv_results).to_csv(f"./data/cv_results_{now_in_milliseconds}.csv", index=False)
 
     # return html with _best
-    return format_model_as_html_table(_best)
+    # return format_model_as_html_table(_best)
 
 # create automl route
 @app.route('/automl', methods=['GET', 'POST'])
@@ -121,18 +122,27 @@ def upload_and_automl():
             filename = secure_filename(file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-            start_automl(file_path, y_column)
 
+            # create a new thread to run automl
+            t = threading.Thread(target=start_automl, args=(file_path, y_column))
+            t.start()
+            
+            return redirect(url_for('uploaded_file',
+                                    filename=filename))
+    # return a upload form and add a hint to the y_column
     return '''
     <!doctype html>
     <title>Upload new File</title>
     <h1>Upload new File</h1>
     <form method=post enctype=multipart/form-data>
         <input type=file name=file>
-        <input type=text name=y_column>
+        <input type=text name=y_column placeholder="Choose target column (to predict)">
         <input type=submit value=Upload>
     </form>
     '''
+
+
+    
 
 
 # create uploaded file route
@@ -144,7 +154,38 @@ def uploaded_file(filename):
     json_data = json.loads(df.to_json(orient='records'))
     # insert json to db
     collection.insert_many(json_data)
-    return 'File uploaded successfully'
+    #return 'File uploaded successfully' and add a picture
+    return '''
+    <!doctype html>
+    <title>Upload new File</title>
+    <h1>Upload new File</h1>
+    <p>File uploaded successfully</p>
+    <iframe src="https://giphy.com/embed/37nRXpCEP9H1f1WVrb" width="480" height="480" frameBorder="0" class="giphy-embed" allowFullScreen></iframe>
+    '''
+
+    
+# create a landing page with a link to the automl route and a link to the get data route with all options
+@app.route('/')
+def index():
+    return '''
+    <!doctype html>
+    <title>Upload new File</title>
+    <h1>Upload new File</h1>
+    <p><a href="/upload">Upload a file</a></p>
+    <p><a href="/automl">Upload a file and run automl</a></p>
+    <p><a href="/get_data_root">Get data</a></p>
+    '''
+
+# create a get data route with all options
+@app.route('/get_data_root')
+def get_data_root():
+    # get all data from db
+    data = collection.find()
+    # convert to json
+    json_data = json.loads(dumps(data))
+    # return json
+    return jsonify(json_data)
+
     
 
 # create get route

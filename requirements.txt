@@ -6,3 +6,6 @@ pymongo
 flask
 werkzeug
 requests
+SQLAlchemy
+Flask-SQLAlchemy
+psycopg2

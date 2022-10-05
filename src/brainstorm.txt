@@ -1,0 +1,23 @@
+routes
+
+create_empty_experiment 
+    --> returns the id of the new experiment with status "open"
+    add new entry in sql db for experiment
+
+upload_csv_for_experiment 
+    --> upload a csv for an experiment id and y_column
+    add csv as blob to sql db for experiment
+
+experiments
+    --> returns a list of all experiments with their status
+    list of sql db
+
+start_experiment
+    --> starts automl for the given experiment
+    load csv from sql db and start automl
+
+get_experiment 
+    --> returns the experiment results/details (incl. status) with the given id
+    load results from sql db for experiment
+
+
