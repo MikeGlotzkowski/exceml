@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 import threading
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, url_for
@@ -59,15 +61,43 @@ def upload_csv_for_experiment():
         experiment.columns = columns
         db.session.commit()
         return jsonify({'id': id})
-    # return request as plain text
-    return request
-
+    return jsonify({'error': 'bad request'}), 400
 # route to get all experiments from postgres db
 @app.route('/get_experiments', methods=['GET'])
 def get_experiments():
+
+    # create a table with all experiments and a status
+    # "new" if no x_df and y_df are present
+    # "ready" if x_df and y_df are present and "results" is empty
+    # "finished" if x_df and y_df are present and "results" is not empty
+
+    # get all experiments
     experiments = Experiment.query.all()
-    experiments = [experiment.to_dict() for experiment in experiments]
-    return jsonify(experiments)
+
+    # create a touple of experiment and status
+    experiments_with_status = []
+    for experiment in experiments:
+        if experiment.x_df is None and experiment.y_df is None:
+            experiments_with_status.append((experiment, 'new_no_csv_uploaded'))
+        elif experiment.x_df is not None and experiment.y_df is not None and experiment.results is None:
+            experiments_with_status.append((experiment, 'ready_csv_uploaded'))
+        elif experiment.x_df is not None and experiment.y_df is not None and experiment.results is not None:
+            experiments_with_status.append((experiment, 'finished_result_available'))
+    
+    experiments_with_status_as_json = []
+    for experiment, status in experiments_with_status:
+        experiments_with_status_as_json.append({
+            'id': experiment.id,
+            'status': status,
+            'y_column': experiment.y_column,
+            'x_columns': experiment.x_columns,
+            'columns': experiment.columns,
+            'results': experiment.results,
+            'best': experiment.best
+        })
+    return jsonify(experiments_with_status_as_json)
+    
+
 
 # route to start experiment
 # load csv for experiment from sql db and start automl
@@ -77,7 +107,7 @@ def start_experiment():
     experiment = Experiment.query.get(id)
     
     # create a new thread to start automl
-    thread = threading.Thread(target=start_automl, args=(experiment))
+    thread = threading.Thread(target=start_automl, args=[experiment])
     thread.start()
     
     return jsonify({'id': id})
@@ -93,6 +123,9 @@ def get_experiment_results():
     return jsonify(results)
 
 def start_automl(experiment):
+
+    app.logger.info('starting automl for experiment with id: {}'.format(experiment.id))
+
     x_df = experiment.x_df
     y_df = experiment.y_df
     y_column = experiment.y_column
@@ -111,6 +144,9 @@ def start_automl(experiment):
     experiment.results = automl.cv_results_
     experiment.best = _best
     db.session.commit()
+
+    app.logger.info('starting automl for experiment with id: {}'.format(experiment.id))
+
     return True
 
 
@@ -152,6 +188,11 @@ def get_create_table_statement_for_experiment():
 
 def main():
     app.run(debug=True)
+    logger = logging.getLogger('werkzeug')
+    logger.setLevel(logging.INFO)
+    app.logger.addHandler(logger)
+
+
 
 if __name__ == '__main__':
     main()

@@ -1,9 +1,0 @@
-GET http://127.0.0.1:5000/create_experiment 
-
-###
-
-GET http://127.0.0.1:5000/get_experiments
-
-###
-
-curl -X POST -F id=1 -F y_column=y -F file=@classification_example.csv http://127.0.0.1:5000/upload_csv_for_experiment
