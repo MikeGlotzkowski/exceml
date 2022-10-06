@@ -6,7 +6,7 @@
 	},
 	"item": [
 		{
-			"name": "001 create_experiment",
+			"name": "001 create experiment",
 			"request": {
 				"method": "GET",
 				"header": [],
@@ -28,7 +28,7 @@
 			"response": []
 		},
 		{
-			"name": "New Request",
+			"name": "002 upload csv for experiment",
 			"request": {
 				"method": "POST",
 				"header": [],
@@ -64,6 +64,60 @@
 					"port": "5000",
 					"path": [
 						"upload_csv_for_experiment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "003 start experiment",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "id",
+							"value": "1",
+							"type": "default"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://127.0.0.1:5000/start_experiment",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "5000",
+					"path": [
+						"start_experiment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "004 get experiments",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://127.0.0.1:5000/get_experiments",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "5000",
+					"path": [
+						"get_experiments"
 					]
 				}
 			},
