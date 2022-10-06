@@ -3,6 +3,7 @@ import logging
 import os
 import threading
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, url_for
+import numpy as np
 import pandas as pd
 from autosklearn.estimators import AutoSklearnClassifier
 from sklearn.model_selection import train_test_split
@@ -10,7 +11,7 @@ import threading
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, url_for
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
-
+#import DataPreprocessorChoice 
 
 
 app = Flask(__name__)
@@ -107,7 +108,7 @@ def start_experiment():
     experiment = Experiment.query.get(id)
     
     # create a new thread to start automl
-    thread = threading.Thread(target=start_automl, args=[experiment])
+    thread = threading.Thread(target=start_automl, args=[experiment, app.app_context()])
     thread.start()
     
     return jsonify({'id': id})
@@ -122,7 +123,7 @@ def get_experiment_results():
     results = experiment.results
     return jsonify(results)
 
-def start_automl(experiment):
+def start_automl(experiment, context ):
 
     app.logger.info('starting automl for experiment with id: {}'.format(experiment.id))
 
@@ -141,25 +142,72 @@ def start_automl(experiment):
     automl.fit(X_train, y_train)
     _best = [model for model in automl.show_models().values() if model["rank"] == 1][0]
 
-    experiment.results = automl.cv_results_
-    experiment.best = _best
-    db.session.commit()
+    with context:
+        db.session.add(experiment)
+        experiment.results = automl.cv_results_
+        experiment.sprint_statistics = automl.sprint_statistics()
+        experiment.leaderboard = automl.leaderboard()
+        experiment.best = _best
+        db.session.commit()
+        app.logger.info('finished automl for experiment with id: {}'.format(experiment.id))
+        return True
+    return False
 
-    app.logger.info('starting automl for experiment with id: {}'.format(experiment.id))
+# create route to get leaderboard for experiment by id
+@app.route('/get_leaderboard', methods=['POST'])
+def get_leaderboard():
+    id = request.form['id']
+    experiment = Experiment.query.get(id)
+    leaderboard = pd.DataFrame(experiment.leaderboard)
+    return leaderboard.to_json()
 
-    return True
+# create route to get sprint_statistics for experiment by id
+@app.route('/get_sprint_statistics', methods=['POST'])
+def get_sprint_statistics():
+    id = request.form['id']
+    experiment = Experiment.query.get(id)
+    sprint_statistics = experiment.sprint_statistics
+    return jsonify(sprint_statistics)
 
+# create route to get best model for experiment by id
+@app.route('/get_best_model', methods=['POST'])
+def get_best_model():
+    id = request.form['id']
+    experiment = Experiment.query.get(id)
+    best_model = experiment.best
+    return json.dumps(best_model, cls=NpEncoder)
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, DataPreprocessorChoice):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
 
 # create Experiment class
 class Experiment(db.Model):
+    __tablename__ = 'experiments'
     id = db.Column(db.Integer, primary_key=True)
     x_df = db.Column(db.PickleType)
     y_df = db.Column(db.PickleType)
-    y_column = db.Column(db.String(80))
+    y_column = db.Column(db.String)
     x_columns = db.Column(db.PickleType)
     columns = db.Column(db.PickleType)
     results = db.Column(db.PickleType)
     best = db.Column(db.PickleType)
+    sprint_statistics = db.Column(db.PickleType)
+    leaderboard = db.Column(db.PickleType)
+
+
+    def __repr__(self):
+        return '<Experiment {}>'.format(self.id)
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -169,22 +217,28 @@ class Experiment(db.Model):
             'x_columns': self.x_columns,
             'columns': self.columns,
             'results': self.results,
-            'best': self.best
+            'best': self.best,
+            'sprint_statistics': self.sprint_statistics,
+            'leaderboard': self.leaderboard
         }
+
 
 def get_create_table_statement_for_experiment():
     return """
-        CREATE TABLE experiment (
-            id SERIAL PRIMARY KEY,
-            x_df BYTEA,
-            y_df BYTEA,
-            y_column VARCHAR(80),
-            x_columns BYTEA,
-            columns BYTEA,
-            results BYTEA,
-            best BYTEA
-        );
+    CREATE TABLE IF NOT EXISTS experiments (
+        id SERIAL PRIMARY KEY,
+        x_df BYTEA,
+        y_df BYTEA,
+        y_column VARCHAR,
+        x_columns BYTEA,
+        columns BYTEA,
+        results BYTEA,
+        best BYTEA,
+        sprint_statistics BYTEA,
+        leaderboard BYTEA
+    );
     """
+        
 
 def main():
     app.run(debug=True)
